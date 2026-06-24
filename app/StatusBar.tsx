@@ -6,7 +6,6 @@ interface Status {
   last_run_at: string
   next_upload_at: string
   uploads_today: number
-  quota_max: number
   queue_breakdown: { script_ready: number; generating: number; ready_to_upload: number }
   mpt_online: boolean
 }
@@ -34,8 +33,6 @@ export default function StatusBar({ status }: { status: Status }) {
     return () => clearInterval(t)
   }, [])
 
-  const pct = Math.min(100, Math.round((status.uploads_today / status.quota_max) * 100))
-
   return (
     <div className="bg-gray-900 rounded-xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
       <div>
@@ -48,16 +45,8 @@ export default function StatusBar({ status }: { status: Status }) {
       </div>
 
       <div>
-        <p className="text-xs text-gray-500 mb-1">Quota diária</p>
-        <div className="flex items-center gap-2">
-          <div className="flex-1 bg-gray-700 rounded-full h-2">
-            <div
-              className={`h-2 rounded-full transition-all ${pct >= 100 ? 'bg-red-500' : 'bg-blue-500'}`}
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <span className="text-xs text-gray-300 shrink-0">{status.uploads_today}/{status.quota_max}</span>
-        </div>
+        <p className="text-xs text-gray-500 mb-1">Uploads hoje</p>
+        <p className="text-gray-200 font-mono text-sm">{status.uploads_today}</p>
         <p className="text-xs text-gray-500 mt-0.5">reset às 08:10 UTC</p>
       </div>
 

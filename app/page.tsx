@@ -30,7 +30,6 @@ interface Status {
   last_run_at: string
   next_upload_at: string
   uploads_today: number
-  quota_max: number
   queue_breakdown: { script_ready: number; generating: number; ready_to_upload: number }
   mpt_online: boolean
 }
@@ -68,7 +67,6 @@ const DEFAULT_STATUS: Status = {
   last_run_at: new Date(0).toISOString(),
   next_upload_at: '',
   uploads_today: 0,
-  quota_max: 6,
   queue_breakdown: { script_ready: 0, generating: 0, ready_to_upload: 0 },
   mpt_online: false,
 }
