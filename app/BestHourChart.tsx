@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 interface Pub {
@@ -13,6 +14,17 @@ function fmt(n: number) {
 }
 
 export default function BestHourChart({ videos }: { videos: Pub[] }) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
+  if (!mounted) {
+    return (
+      <div className="bg-gray-900 rounded-xl p-6 text-center text-gray-600 text-sm">
+        A carregar…
+      </div>
+    )
+  }
+
   if (videos.length < 5) {
     return (
       <div className="bg-gray-900 rounded-xl p-6 text-center text-gray-600 text-sm">

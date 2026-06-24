@@ -127,12 +127,16 @@ export default async function Page() {
         <BestHourChart videos={published} />
       </section>
 
-      {/* Upload queue */}
-      {queue.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold mb-3 text-gray-300">
-            📋 Fila de Upload — {queue.length} vídeos
-          </h2>
+      {/* Upload queue — always visible */}
+      <section>
+        <h2 className="text-lg font-semibold mb-3 text-gray-300">
+          📋 Fila de Upload — {queue.length} vídeos
+        </h2>
+        {queue.length === 0 ? (
+          <div className="bg-gray-900 rounded-xl p-6 text-center text-gray-600 text-sm">
+            A sincronizar com o engine… (atualiza em até 2 min)
+          </div>
+        ) : (
           <div className="bg-gray-900 rounded-xl divide-y divide-gray-800">
             {queue.map((item) => (
               <div key={item.id} className="flex items-center justify-between px-4 py-3">
@@ -159,8 +163,8 @@ export default async function Page() {
               </div>
             ))}
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       <p className="text-xs text-gray-700 text-center">
         Atualiza automaticamente a cada 2 min · MoneyAgent MAX engine

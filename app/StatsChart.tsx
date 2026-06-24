@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface HistoryEntry {
@@ -16,10 +17,13 @@ function fmt(n: number) {
 }
 
 export default function StatsChart({ history }: { history: HistoryEntry[] }) {
-  if (history.length < 2) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
+  if (!mounted || history.length < 2) {
     return (
       <div className="bg-gray-900 rounded-xl p-6 text-center text-gray-600 text-sm">
-        Aguardando dados — gráfico disponível com 2+ dias de histórico
+        {!mounted ? 'A carregar…' : 'Aguardando dados — gráfico disponível com 2+ dias de histórico'}
       </div>
     )
   }
