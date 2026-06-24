@@ -63,7 +63,8 @@ export default function StatsChart({ history }: { history: HistoryEntry[] }) {
           <Tooltip
             contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8 }}
             labelStyle={{ color: '#d1d5db', fontSize: 12 }}
-            formatter={(v: number) => [fmt(v), 'Views']}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            formatter={(v: any) => [fmt(v as number), 'Views'] as any}
           />
           <Area
             type="monotone"

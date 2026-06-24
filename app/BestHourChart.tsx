@@ -84,7 +84,8 @@ export default function BestHourChart({ videos }: { videos: Pub[] }) {
           <Tooltip
             contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8 }}
             labelStyle={{ color: '#d1d5db', fontSize: 12 }}
-            formatter={(v: number) => [`${fmt(v)} views avg`, '']}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            formatter={(v: any) => [`${fmt(v as number)} views avg`, ''] as any}
           />
           <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
             {data.map((d) => (
