@@ -51,14 +51,32 @@ function Card({ v }: { v: Pub }) {
   )
 }
 
+type SortKey = 'date' | 'views' | 'likes' | 'comments'
+
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: 'date', label: 'Recente' },
+  { key: 'views', label: 'Views' },
+  { key: 'likes', label: 'Likes' },
+  { key: 'comments', label: 'Comentários' },
+]
+
+function sortVideos(videos: Pub[], key: SortKey): Pub[] {
+  return [...videos].sort((a, b) => {
+    if (key === 'date') return new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
+    return b[key] - a[key]
+  })
+}
+
 export default function PublishedSection({ videos }: { videos: Pub[] }) {
   const categories = Array.from(new Set(videos.map((v) => v.category))).sort()
   const [sel, setSel] = useState<string>('All')
+  const [sort, setSort] = useState<SortKey>('date')
 
   const counts: Record<string, number> = { All: videos.length }
   for (const c of categories) counts[c] = videos.filter((v) => v.category === c).length
 
-  const shown = sel === 'All' ? videos : videos.filter((v) => v.category === sel)
+  const filtered = sel === 'All' ? videos : videos.filter((v) => v.category === sel)
+  const shown = sortVideos(filtered, sort)
   const tabs = ['All', ...categories]
 
   return (
@@ -67,21 +85,41 @@ export default function PublishedSection({ videos }: { videos: Pub[] }) {
         🎬 Published — {videos.length} videos
       </h2>
 
-      {/* Category filter */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {tabs.map((c) => (
-          <button
-            key={c}
-            onClick={() => setSel(c)}
-            className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
-              sel === c
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-            }`}
-          >
-            {c} <span className="opacity-60">({counts[c]})</span>
-          </button>
-        ))}
+      {/* Category filter + sort */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex flex-wrap gap-2">
+          {tabs.map((c) => (
+            <button
+              type="button"
+              key={c}
+              onClick={() => setSel(c)}
+              className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+                sel === c
+                  ? 'bg-red-600 text-white'
+                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              {c} <span className="opacity-60">({counts[c]})</span>
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-xs text-gray-500">Ordenar:</span>
+          {SORTS.map((s) => (
+            <button
+              type="button"
+              key={s.key}
+              onClick={() => setSort(s.key)}
+              className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
+                sort === s.key
+                  ? 'bg-gray-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {shown.length === 0 ? (
