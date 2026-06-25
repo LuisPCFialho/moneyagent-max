@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MoneyAgent MAX — Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    body { background: #030712; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .pulse { animation: pulse 2s ease-in-out infinite; }
+  </style>
+</head>
+<body class="text-white min-h-screen">
+<main class="max-w-7xl mx-auto p-6 space-y-8">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between flex-wrap gap-3">
+    <div class="flex items-center gap-3">
+      <span class="w-3 h-3 rounded-full bg-red-500 pulse"></span>
+      <h1 class="text-2xl font-bold tracking-tight">MoneyAgent MAX</h1>
+    </div>
+    <div id="hdr" class="flex gap-6 text-sm text-gray-400"></div>
+  </div>
+
+  <!-- Status Bar -->
+  <div id="status" class="rounded-xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm" style="background:#111827"></div>
+
+  <!-- Published -->
+  <section id="published"></section>
+
+  <!-- Top 3 -->
+  <section id="top3"></section>
+
+  <!-- Best Hour -->
+  <section>
+    <h2 class="text-lg font-semibold mb-3 text-gray-300">⏰ Análise de Hora de Publicação</h2>
+    <div class="rounded-xl p-4" style="background:#111827">
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <p class="text-sm font-medium text-gray-400">Melhor hora para publicar (UTC)</p>
+          <p class="text-xs text-gray-600">Média de views por hora de upload</p>
+        </div>
+        <div id="hour-badge" class="text-right"></div>
+      </div>
+      <canvas id="hour-chart"></canvas>
+      <div id="hour-ph" class="text-center text-gray-600 text-sm py-8"></div>
+    </div>
+  </section>
+
+  <!-- Views History -->
+  <section>
+    <h2 class="text-lg font-semibold mb-3 text-gray-300">📈 Views ao Longo do Tempo</h2>
+    <div class="rounded-xl p-4" style="background:#111827">
+      <canvas id="hist-chart"></canvas>
+      <div id="hist-ph" class="text-center text-gray-600 text-sm py-8"></div>
+    </div>
+  </section>
+
+  <!-- Queue -->
+  <section id="queue"></section>
+
+</main>
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+let PUB = [], QUEUE = [], STATUS = {}, HISTORY = []
+let hourChart = null, histChart = null
+let filt = 'All', sort = 'date'
+
+const CAT_COLOR = {
+  Animals:'#f97316', Space:'#8b5cf6', 'Human Body':'#ec4899',
+  Science:'#3b82f6', History:'#f59e0b', Psychology:'#10b981',
+  Nature:'#84cc16', Technology:'#06b6d4', Other:'#ef4444',
+}
+const CAT_ORDER = ['Animals','Space','Human Body','Science','History','Psychology','Nature','Technology','Other']
+
+function col(cat) { return CAT_COLOR[cat] || '#ef4444' }
+
+function fmt(n) {
+  n = n || 0
+  if (n >= 1e6) return (n/1e6).toFixed(1)+'M'
+  if (n >= 1e3) return (n/1e3).toFixed(1)+'K'
+  return String(Math.round(n))
+}
+
+function ago(iso) {
+  if (!iso) return '—'
+  const s = Math.floor((Date.now() - new Date(iso)) / 1000)
+  if (s < 60) return s+'s atrás'
+  if (s < 3600) return Math.floor(s/60)+'m atrás'
+  return Math.floor(s/3600)+'h atrás'
+}
+
+function until(iso) {
+  if (!iso) return '—'
+  const s = Math.floor((new Date(iso) - Date.now()) / 1000)
+  if (s <= 0) return 'agora'
+  if (s < 60) return s+'s'
+  if (s < 3600) return Math.floor(s/60)+'m'
+  return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m'
+}
+
+// ── Header ─────────────────────────────────────────────────────────────────────
+function renderHdr() {
+  const views = PUB.reduce((s,v)=>s+(v.views||0),0)
+  const likes  = PUB.reduce((s,v)=>s+(v.likes||0),0)
+  document.getElementById('hdr').innerHTML =
+    `<span><b class="text-white">${PUB.length}</b> publicados</span>` +
+    `<span><b class="text-white">${fmt(views)}</b> views</span>` +
+    `<span><b class="text-white">${likes}</b> likes</span>` +
+    `<span><b class="text-white">${QUEUE.length}</b> em fila</span>`
+}
+
+// ── Status Bar ─────────────────────────────────────────────────────────────────
+function renderStatus() {
+  const s = STATUS, qb = s.queue_breakdown || {}
+  const online = s.mpt_online
+  document.getElementById('status').innerHTML = `
+    <div>
+      <p class="text-xs text-gray-500 mb-1">Motor</p>
+      <div class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full shrink-0" style="background:${online?'#4ade80':'#ef4444'}"></span>
+        <span class="text-gray-200">${online?'Online':'Offline'}</span>
+      </div>
+      <p class="text-xs text-gray-500 mt-0.5">último ciclo ${ago(s.last_run_at)}</p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500 mb-1">Uploads hoje</p>
+      <p class="text-gray-200 font-mono text-sm">${s.uploads_today??0}</p>
+      <p class="text-xs text-gray-500 mt-0.5">reset às 08:10 UTC</p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500 mb-1">Próximo upload</p>
+      <p class="text-gray-200 font-mono text-sm">${until(s.next_upload_at)}</p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500 mb-1">Buffer</p>
+      <div class="flex gap-1.5 flex-wrap">
+        <span class="text-xs px-2 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">📝 ${qb.script_ready??0}</span>
+        <span class="text-xs px-2 py-0.5 rounded-full" style="background:#3b1f00;color:#fcd34d">⚙️ ${qb.generating??0}</span>
+        <span class="text-xs px-2 py-0.5 rounded-full" style="background:#052e16;color:#86efac">✅ ${qb.ready_to_upload??0}</span>
+      </div>
+    </div>`
+}
+
+// ── Published ──────────────────────────────────────────────────────────────────
+function renderPublished() {
+  const catCounts = {}
+  PUB.forEach(v => { const c=v.category||'Other'; catCounts[c]=(catCounts[c]||0)+1 })
+  const cats = ['All', ...Object.keys(catCounts).sort()]
+
+  const filtered = filt==='All' ? PUB : PUB.filter(v=>(v.category||'Other')===filt)
+  const sorted = [...filtered].sort((a,b)=>{
+    if (sort==='date') return new Date(b.uploaded_at)-new Date(a.uploaded_at)
+    return (b[sort]||0)-(a[sort]||0)
+  })
+
+  const catBtns = cats.map(c=>{
+    const n = c==='All' ? PUB.length : catCounts[c]
+    const on = c===filt
+    return `<button type="button" onclick="setFilt('${c}')" style="font-size:12px;font-weight:600;padding:6px 14px;border-radius:9999px;border:none;cursor:pointer;background:${on?'#dc2626':'#1f2937'};color:${on?'white':'#d1d5db'}">${c} <span style="opacity:.6">(${n})</span></button>`
+  }).join('')
+
+  const sortBtns = [['date','Recente'],['views','Views'],['likes','Likes'],['comments','Comentários']].map(([k,l])=>{
+    const on = k===sort
+    return `<button type="button" onclick="setSort('${k}')" style="font-size:12px;padding:4px 12px;border-radius:9999px;border:none;cursor:pointer;background:${on?'#4b5563':'#1f2937'};color:${on?'white':'#9ca3af'}">${l}</button>`
+  }).join('')
+
+  const cards = sorted.map(v=>{
+    const cat = v.category||'Other'
+    const c = col(cat)
+    return `<a href="${v.url||('#')}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none;background:#111827;border-radius:12px;overflow:hidden">
+      <div style="position:relative">
+        <img src="${v.thumbnail||''}" alt="" style="width:100%;height:144px;object-fit:cover">
+        <span style="position:absolute;top:8px;left:8px;background:${c}cc;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:9999px">${cat}</span>
+        <span style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.7);color:white;font-size:12px;padding:2px 8px;border-radius:9999px;font-weight:700">👁 ${fmt(v.views)}</span>
+      </div>
+      <div style="padding:12px">
+        <p style="font-size:14px;font-weight:500;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:white">${v.title||''}</p>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <span style="font-size:11px;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:9999px">👁 ${fmt(v.views)}</span>
+          <span style="font-size:11px;background:#052e16;color:#86efac;padding:2px 8px;border-radius:9999px">👍 ${v.likes||0}</span>
+          <span style="font-size:11px;background:#3b1f00;color:#fcd34d;padding:2px 8px;border-radius:9999px">💬 ${v.comments||0}</span>
+        </div>
+      </div>
+    </a>`
+  }).join('')
+
+  document.getElementById('published').innerHTML = `
+    <h2 class="text-lg font-semibold mb-3 text-gray-300">🎬 Published — ${PUB.length} videos</h2>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px">${catBtns}</div>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span style="font-size:12px;color:#6b7280">Ordenar:</span>${sortBtns}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px">${cards}</div>`
+}
+
+function setFilt(c) { filt=c; renderPublished() }
+function setSort(k) { sort=k; renderPublished() }
+
+// ── Top 3 ──────────────────────────────────────────────────────────────────────
+function renderTop3() {
+  const byCat = {}
+  PUB.forEach(v=>{ const c=v.category||'Other'; (byCat[c]=byCat[c]||[]).push(v) })
+
+  const sections = CAT_ORDER.filter(c=>byCat[c]?.length).map(cat=>{
+    const top = [...byCat[cat]].sort((a,b)=>(b.views||0)-(a.views||0)).slice(0,3)
+    const items = top.map((v,i)=>`
+      <a href="${v.url||'#'}" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:12px;padding:10px;background:#1f2937;border-radius:12px;text-decoration:none;color:inherit">
+        <span style="font-size:18px;font-weight:700;color:#6b7280;width:24px;text-align:center">${i+1}</span>
+        <img src="${v.thumbnail||''}" style="width:48px;height:48px;border-radius:8px;object-fit:cover">
+        <div style="flex:1;min-width:0">
+          <p style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.title||''}</p>
+          <span style="font-size:11px;color:#ef4444">👁 ${fmt(v.views)}</span>
+        </div>
+      </a>`).join('')
+    return `<div>
+      <p style="font-size:11px;font-weight:600;color:#6b7280;letter-spacing:.05em;margin-bottom:8px">${cat.toUpperCase()}</p>
+      <div style="display:flex;flex-direction:column;gap:8px">${items}</div>
+    </div>`
+  }).join('')
+
+  document.getElementById('top3').innerHTML = `
+    <h2 class="text-lg font-semibold mb-3 text-gray-300">🏆 Top 3 por Categoria</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px">${sections}</div>`
+}
+
+// ── Best Hour Chart ────────────────────────────────────────────────────────────
+function renderHour() {
+  const canvas = document.getElementById('hour-chart')
+  const ph = document.getElementById('hour-ph')
+
+  if (PUB.length < 5) {
+    canvas.style.display='none'; ph.textContent=`Precisa de pelo menos 5 vídeos (atual: ${PUB.length})`; return
+  }
+  ph.textContent=''; canvas.style.display=''
+
+  const hm = {}
+  PUB.forEach(v=>{ if(!v.uploaded_at)return; const h=new Date(v.uploaded_at).getUTCHours(); hm[h]=(hm[h]||{sum:0,n:0}); hm[h].sum+=(v.views||0); hm[h].n++ })
+  const data = Object.entries(hm).map(([h,d])=>({h:+h,lbl:`${String(h).padStart(2,'0')}h`,avg:Math.round(d.sum/d.n)})).sort((a,b)=>a.h-b.h)
+  const maxAvg = Math.max(...data.map(d=>d.avg))
+  const best = data.find(d=>d.avg===maxAvg)
+
+  document.getElementById('hour-badge').innerHTML = best
+    ? `<p style="font-size:11px;color:#6b7280">melhor hora</p><p style="font-size:18px;font-weight:700;color:#f59e0b">${best.lbl}</p><p style="font-size:11px;color:#6b7280">${fmt(best.avg)} avg</p>`
+    : ''
+
+  if (hourChart) { hourChart.destroy(); hourChart=null }
+  hourChart = new Chart(canvas, {
+    type:'bar',
+    data:{
+      labels:data.map(d=>d.lbl),
+      datasets:[{data:data.map(d=>d.avg),backgroundColor:data.map(d=>d.avg===maxAvg?'#f59e0b':'rgba(59,130,246,.7)'),borderRadius:4}]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${fmt(c.raw)} views avg`}}},
+      scales:{
+        x:{grid:{display:false},ticks:{color:'#6b7280',font:{size:10}}},
+        y:{grid:{color:'#1f2937'},ticks:{color:'#6b7280',font:{size:10},callback:fmt}}
+      }
+    }
+  })
+}
+
+// ── History Chart ──────────────────────────────────────────────────────────────
+function renderHist() {
+  const canvas = document.getElementById('hist-chart')
+  const ph = document.getElementById('hist-ph')
+
+  if (HISTORY.length < 2) {
+    canvas.style.display='none'; ph.textContent='Aguardando dados (mínimo 2 dias)…'; return
+  }
+  ph.textContent=''; canvas.style.display=''
+
+  if (histChart) { histChart.destroy(); histChart=null }
+  histChart = new Chart(canvas, {
+    type:'line',
+    data:{
+      labels:HISTORY.map(e=>e.date.slice(5)),
+      datasets:[{label:'Views',data:HISTORY.map(e=>e.views),borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.15)',tension:.4,fill:true,pointRadius:3,pointBackgroundColor:'#3b82f6'}]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${fmt(c.raw)} views`}}},
+      scales:{
+        x:{grid:{display:false},ticks:{color:'#6b7280',font:{size:10}}},
+        y:{grid:{color:'#1f2937'},ticks:{color:'#6b7280',font:{size:10},callback:fmt}}
+      }
+    }
+  })
+}
+
+// ── Queue ──────────────────────────────────────────────────────────────────────
+function renderQueue() {
+  const rows = QUEUE.map(v=>{
+    const cat=v.category||'Other', c=col(cat)
+    return `<div style="display:flex;align-items:center;gap:16px;padding:12px 16px;border-radius:8px;background:#111827">
+      <span style="width:8px;height:8px;border-radius:50%;background:#4ade80;flex-shrink:0"></span>
+      <span style="font-size:12px;font-weight:600;padding:2px 8px;border-radius:9999px;background:${c}22;color:${c};flex-shrink:0">${cat}</span>
+      <span style="flex:1;font-size:14px;color:#d1d5db;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.yt_title||''}</span>
+      <span style="font-size:12px;font-weight:600;color:#4ade80;background:#052e16;padding:2px 8px;border-radius:9999px;flex-shrink:0">pronto</span>
+      <span style="font-size:12px;color:#6b7280;font-family:monospace;flex-shrink:0">${v.scheduled_at||''}</span>
+    </div>`
+  }).join('')
+
+  document.getElementById('queue').innerHTML = `
+    <h2 class="text-lg font-semibold mb-3 text-gray-300">📋 Fila de Upload — ${QUEUE.length} vídeos</h2>
+    ${QUEUE.length===0
+      ? `<div class="rounded-xl p-6 text-center text-sm text-gray-600" style="background:#111827">A sincronizar com o engine… (atualiza em até 2 min)</div>`
+      : `<div style="display:flex;flex-direction:column;gap:8px">${rows}</div>`}`
+}
+
+// ── Fetch & Bootstrap ──────────────────────────────────────────────────────────
+async function fetchAll() {
+  const t = '?t='+Date.now()
+  ;[PUB,QUEUE,STATUS,HISTORY] = await Promise.all([
+    fetch('public/published_snapshot.json'+t).then(r=>r.json()).catch(()=>[]),
+    fetch('public/queue_snapshot.json'+t).then(r=>r.json()).catch(()=>[]),
+    fetch('public/status_snapshot.json'+t).then(r=>r.json()).catch(()=>({})),
+    fetch('public/stats_history.json'+t).then(r=>r.json()).catch(()=>[]),
+  ])
+  renderAll()
+}
+
+function renderAll() {
+  renderHdr(); renderStatus(); renderPublished()
+  renderTop3(); renderHour(); renderHist(); renderQueue()
+}
+
+fetchAll()
+setInterval(fetchAll, 120_000)
+setInterval(()=>{ renderHdr(); renderStatus() }, 30_000)
+</script>
+</body>
+</html>
