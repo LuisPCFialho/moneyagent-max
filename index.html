@@ -31,7 +31,7 @@
   </div>
 
   <!-- Status Bar -->
-  <div id="status" class="rounded-xl p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm" style="background:#111827"></div>
+  <div id="status" class="rounded-xl p-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 text-sm" style="background:#111827"></div>
 
   <!-- Monetização -->
   <section id="monetization"></section>
@@ -137,11 +137,15 @@ function renderHdr() {
         : ` <span style="color:#f87171;font-size:11px">${diff}</span>`
     }
   }
+  const growth7d = HISTORY.length >= 2 ? (HISTORY[HISTORY.length-1].subs_growth_7d || null) : null
+  const growth7dHtml = growth7d != null
+    ? ` <span style="font-size:10px;color:${growth7d>=0?'#4ade80':'#f87171'}">(${growth7d>=0?'+':''}${growth7d} 7d)</span>`
+    : ''
   document.getElementById('hdr').innerHTML =
     `<span><b class="text-white">${PUB.length}</b> publicados</span>` +
     `<span><b class="text-white">${fmt(views)}</b> views${trendViews}</span>` +
     `<span><b class="text-white">${likes}</b> likes</span>` +
-    `<span><b class="text-white">${subs}</b> subs${trendSubs}</span>` +
+    `<span><b class="text-white">${subs}</b> subs${trendSubs}${growth7dHtml}</span>` +
     `<span><b class="text-white">${QUEUE.length}</b> em fila</span>`
 }
 
@@ -184,9 +188,14 @@ function renderStatus() {
       <p class="text-xs text-gray-500 mt-0.5">@ $1 RPM</p>
     </div>
     <div>
-      <p class="text-xs text-gray-500 mb-1">Melhores dias</p>
-      <p class="text-gray-200 font-mono text-sm">${(s.best_days||[]).join(', ') || '— (sem dados)'}</p>
-      <p class="text-xs text-gray-500 mt-0.5">por avg views</p>
+      <p class="text-xs text-gray-500 mb-1">Melhores horas</p>
+      <p class="text-gray-200 font-mono text-sm">${(s.best_hours||[]).map(h=>h+'h').join(' ') || '—'}</p>
+      <p class="text-xs text-gray-500 mt-0.5">avg views (UTC)</p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500 mb-1">Script / Latência</p>
+      <p class="text-gray-200 font-mono text-sm">${s.avg_word_count||'—'} words</p>
+      <p class="text-xs text-gray-500 mt-0.5">latência: ${s.avg_latency_min||'—'} min</p>
     </div>`
 }
 
@@ -286,6 +295,7 @@ function renderPublished() {
           <span style="font-size:11px;background:#3b1f00;color:#fcd34d;padding:2px 8px;border-radius:9999px">💬 ${v.comments||0}</span>
           ${lr>0?`<span style="font-size:11px;background:#1c1917;color:${lrColor};padding:2px 8px;border-radius:9999px">${lr}% like</span>`:''}
           ${v.views_24h>0?`<span style="font-size:11px;background:#1e1b4b;color:#a5b4fc;padding:2px 8px;border-radius:9999px">🚀 24h: ${fmt(v.views_24h)}</span>`:''}
+          ${v.views_1h>0?`<span style="font-size:11px;background:#14532d;color:#86efac;padding:2px 8px;border-radius:9999px">⚡ 1h: ${fmt(v.views_1h)}</span>`:''}
         </div>
       </div>
     </a>`
