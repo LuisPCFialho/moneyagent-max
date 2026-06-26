@@ -1,1 +1,1 @@
-{"last_run_at": "2026-06-26T02:08:08.717539+00:00", "next_upload_at": "2026-06-26T02:20:54.602872+00:00", "uploads_today": 4, "queue_breakdown": {"script_ready": 0, "generating": 2, "ready_to_upload": 48}, "mpt_online": true}
+{"last_run_at": "2026-06-26T02:10:49.655427+00:00", "next_upload_at": "2026-06-26T02:20:54.602872+00:00", "uploads_today": 4, "queue_breakdown": {"script_ready": 0, "generating": 1, "ready_to_upload": 49}, "mpt_online": true, "subscribers": 0, "channel_views": 0, "ab_stats": {"a": {"avg": 298, "n": 63}}}
