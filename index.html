@@ -31,7 +31,10 @@
   </div>
 
   <!-- Status Bar -->
-  <div id="status" class="rounded-xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm" style="background:#111827"></div>
+  <div id="status" class="rounded-xl p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm" style="background:#111827"></div>
+
+  <!-- Monetização -->
+  <section id="monetization"></section>
 
   <!-- Published -->
   <section id="published"></section>
@@ -55,24 +58,30 @@
     </div>
   </section>
 
-  <!-- Views History -->
+  <!-- Views + Subscribers History -->
   <section>
-    <h2 class="text-lg font-semibold mb-3 text-gray-300">📈 Views ao Longo do Tempo</h2>
+    <h2 class="text-lg font-semibold mb-3 text-gray-300">📈 Views & Subscribers ao Longo do Tempo</h2>
     <div class="rounded-xl p-4" style="background:#111827">
       <canvas id="hist-chart"></canvas>
       <div id="hist-ph" class="text-center text-gray-600 text-sm py-8"></div>
     </div>
   </section>
 
+  <!-- A/B Stats -->
+  <section id="ab-stats"></section>
+
   <!-- Queue -->
   <section id="queue"></section>
+
+  <!-- Failed -->
+  <section id="failed"></section>
 
 </main>
 <script>
 // ── State ──────────────────────────────────────────────────────────────────────
-let PUB = [], QUEUE = [], STATUS = {}, HISTORY = []
+let PUB = [], QUEUE = [], STATUS = {}, HISTORY = [], FAILED = []
 let hourChart = null, histChart = null
-let filt = 'All', sort = 'date'
+let filt = 'All', sort = 'date', search = ''
 
 const CAT_COLOR = {
   Animals:'#f97316', Space:'#8b5cf6', 'Human Body':'#ec4899',
@@ -111,10 +120,12 @@ function until(iso) {
 function renderHdr() {
   const views = PUB.reduce((s,v)=>s+(v.views||0),0)
   const likes  = PUB.reduce((s,v)=>s+(v.likes||0),0)
+  const subs   = STATUS.subscribers || 0
   document.getElementById('hdr').innerHTML =
     `<span><b class="text-white">${PUB.length}</b> publicados</span>` +
     `<span><b class="text-white">${fmt(views)}</b> views</span>` +
     `<span><b class="text-white">${likes}</b> likes</span>` +
+    `<span><b class="text-white">${subs}</b> subs</span>` +
     `<span><b class="text-white">${QUEUE.length}</b> em fila</span>`
 }
 
@@ -122,6 +133,8 @@ function renderHdr() {
 function renderStatus() {
   const s = STATUS, qb = s.queue_breakdown || {}
   const online = s.mpt_online
+  const subs = s.subscribers || 0
+  const chViews = s.channel_views || 0
   document.getElementById('status').innerHTML = `
     <div>
       <p class="text-xs text-gray-500 mb-1">Motor</p>
@@ -132,13 +145,9 @@ function renderStatus() {
       <p class="text-xs text-gray-500 mt-0.5">último ciclo ${ago(s.last_run_at)}</p>
     </div>
     <div>
-      <p class="text-xs text-gray-500 mb-1">Uploads hoje</p>
-      <p class="text-gray-200 font-mono text-sm">${s.uploads_today??0}</p>
-      <p class="text-xs text-gray-500 mt-0.5">reset às 08:10 UTC</p>
-    </div>
-    <div>
       <p class="text-xs text-gray-500 mb-1">Próximo upload</p>
       <p class="text-gray-200 font-mono text-sm">${until(s.next_upload_at)}</p>
+      <p class="text-xs text-gray-500 mt-0.5">uploads hoje: ${s.uploads_today??0}</p>
     </div>
     <div>
       <p class="text-xs text-gray-500 mb-1">Buffer</p>
@@ -146,6 +155,57 @@ function renderStatus() {
         <span class="text-xs px-2 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">📝 ${qb.script_ready??0}</span>
         <span class="text-xs px-2 py-0.5 rounded-full" style="background:#3b1f00;color:#fcd34d">⚙️ ${qb.generating??0}</span>
         <span class="text-xs px-2 py-0.5 rounded-full" style="background:#052e16;color:#86efac">✅ ${qb.ready_to_upload??0}</span>
+      </div>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500 mb-1">Subscribers</p>
+      <p class="text-gray-200 font-mono text-lg font-bold">${subs.toLocaleString()}</p>
+      <p class="text-xs text-gray-500 mt-0.5">${Math.round(subs/1000*100)}% meta 1k</p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500 mb-1">Views canal</p>
+      <p class="text-gray-200 font-mono text-sm">${fmt(chViews)}</p>
+      <p class="text-xs text-gray-500 mt-0.5">total histórico</p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500 mb-1">Views engine</p>
+      <p class="text-gray-200 font-mono text-sm">${fmt(PUB.reduce((s,v)=>s+(v.views||0),0))}</p>
+      <p class="text-xs text-gray-500 mt-0.5">${PUB.length} vídeos</p>
+    </div>`
+}
+
+// ── Monetização ────────────────────────────────────────────────────────────────
+function renderMonetization() {
+  const subs     = STATUS.subscribers || 0
+  const totalViews = PUB.reduce((s,v)=>s+(v.views||0),0)
+  const SUB_GOAL  = 1000
+  const VIEW_GOAL = 10_000_000
+
+  const subsPct  = Math.min(100, subs / SUB_GOAL * 100)
+  const viewsPct = Math.min(100, totalViews / VIEW_GOAL * 100)
+
+  document.getElementById('monetization').innerHTML = `
+    <h2 class="text-lg font-semibold mb-3 text-gray-300">💰 Progresso para Monetização (YouTube Shorts)</h2>
+    <div class="rounded-xl p-5 grid grid-cols-1 sm:grid-cols-2 gap-6" style="background:#111827">
+      <div>
+        <div class="flex justify-between text-sm mb-1">
+          <span class="text-gray-400">Subscribers</span>
+          <span class="font-mono text-white">${subs.toLocaleString()} / ${SUB_GOAL.toLocaleString()}</span>
+        </div>
+        <div style="background:#1f2937;border-radius:9999px;height:10px;overflow:hidden">
+          <div style="background:linear-gradient(90deg,#f59e0b,#ef4444);height:100%;width:${subsPct.toFixed(1)}%;border-radius:9999px;transition:width .5s"></div>
+        </div>
+        <p class="text-xs text-gray-600 mt-1">${subsPct.toFixed(1)}% — faltam ${Math.max(0,SUB_GOAL-subs).toLocaleString()} subs</p>
+      </div>
+      <div>
+        <div class="flex justify-between text-sm mb-1">
+          <span class="text-gray-400">Shorts Views (90 dias)</span>
+          <span class="font-mono text-white">${fmt(totalViews)} / 10M</span>
+        </div>
+        <div style="background:#1f2937;border-radius:9999px;height:10px;overflow:hidden">
+          <div style="background:linear-gradient(90deg,#3b82f6,#8b5cf6);height:100%;width:${viewsPct.toFixed(1)}%;border-radius:9999px;transition:width .5s"></div>
+        </div>
+        <p class="text-xs text-gray-600 mt-1">${viewsPct.toFixed(2)}% — faltam ${fmt(Math.max(0,VIEW_GOAL-totalViews))} views</p>
       </div>
     </div>`
 }
@@ -156,7 +216,12 @@ function renderPublished() {
   PUB.forEach(v => { const c=v.category||'Other'; catCounts[c]=(catCounts[c]||0)+1 })
   const cats = ['All', ...Object.keys(catCounts).sort()]
 
-  const filtered = filt==='All' ? PUB : PUB.filter(v=>(v.category||'Other')===filt)
+  const q = search.toLowerCase()
+  const filtered = PUB.filter(v=>{
+    const matchCat = filt==='All' || (v.category||'Other')===filt
+    const matchSearch = !q || (v.title||'').toLowerCase().includes(q)
+    return matchCat && matchSearch
+  })
   const sorted = [...filtered].sort((a,b)=>{
     if (sort==='date') return new Date(b.uploaded_at)-new Date(a.uploaded_at)
     return (b[sort]||0)-(a[sort]||0)
@@ -176,11 +241,14 @@ function renderPublished() {
   const cards = sorted.map(v=>{
     const cat = v.category||'Other'
     const c = col(cat)
+    const lr = v.like_rate || 0
+    const lrColor = lr >= 5 ? '#4ade80' : lr >= 2 ? '#fcd34d' : '#9ca3af'
     return `<a href="${v.url||('#')}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none;background:#111827;border-radius:12px;overflow:hidden">
       <div style="position:relative">
         <img src="${v.thumbnail||''}" alt="" style="width:100%;height:144px;object-fit:cover">
         <span style="position:absolute;top:8px;left:8px;background:${c}cc;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:9999px">${cat}</span>
         <span style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.7);color:white;font-size:12px;padding:2px 8px;border-radius:9999px;font-weight:700">👁 ${fmt(v.views)}</span>
+        ${v.title_variant==='b'?`<span style="position:absolute;bottom:8px;right:8px;background:rgba(139,92,246,.85);color:white;font-size:10px;padding:1px 6px;border-radius:9999px">B</span>`:''}
       </div>
       <div style="padding:12px">
         <p style="font-size:14px;font-weight:500;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:white">${v.title||''}</p>
@@ -188,6 +256,7 @@ function renderPublished() {
           <span style="font-size:11px;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:9999px">👁 ${fmt(v.views)}</span>
           <span style="font-size:11px;background:#052e16;color:#86efac;padding:2px 8px;border-radius:9999px">👍 ${v.likes||0}</span>
           <span style="font-size:11px;background:#3b1f00;color:#fcd34d;padding:2px 8px;border-radius:9999px">💬 ${v.comments||0}</span>
+          ${lr>0?`<span style="font-size:11px;background:#1c1917;color:${lrColor};padding:2px 8px;border-radius:9999px">${lr}% like</span>`:''}
           ${v.views_24h>0?`<span style="font-size:11px;background:#1e1b4b;color:#a5b4fc;padding:2px 8px;border-radius:9999px">🚀 24h: ${fmt(v.views_24h)}</span>`:''}
         </div>
       </div>
@@ -196,17 +265,22 @@ function renderPublished() {
 
   document.getElementById('published').innerHTML = `
     <h2 class="text-lg font-semibold mb-3 text-gray-300">🎬 Published — ${PUB.length} videos</h2>
-    <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px">
+    <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
       <div style="display:flex;flex-wrap:wrap;gap:8px">${catBtns}</div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         <span style="font-size:12px;color:#6b7280">Ordenar:</span>${sortBtns}
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px">${cards}</div>`
+    <div style="margin-bottom:12px">
+      <input type="text" placeholder="🔍 Pesquisar vídeos…" oninput="setSearch(this.value)" value="${search}"
+        style="width:100%;padding:8px 14px;border-radius:9999px;background:#1f2937;border:1px solid #374151;color:white;font-size:13px;outline:none">
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px">${cards || '<p style="color:#6b7280;text-align:center;padding:24px">Nenhum vídeo encontrado</p>'}</div>`
 }
 
 function setFilt(c) { filt=c; renderPublished() }
 function setSort(k) { sort=k; renderPublished() }
+function setSearch(v) { search=v; renderPublished() }
 
 // ── Top 3 ──────────────────────────────────────────────────────────────────────
 function renderTop3() {
@@ -273,7 +347,7 @@ function renderHour() {
   })
 }
 
-// ── History Chart ──────────────────────────────────────────────────────────────
+// ── History Chart (views + subs) ───────────────────────────────────────────────
 function renderHist() {
   const canvas = document.getElementById('hist-chart')
   const ph = document.getElementById('hist-ph')
@@ -283,22 +357,63 @@ function renderHist() {
   }
   ph.textContent=''; canvas.style.display=''
 
+  const hasSubs = HISTORY.some(e=>e.subs>0)
   if (histChart) { histChart.destroy(); histChart=null }
   histChart = new Chart(canvas, {
     type:'line',
     data:{
       labels:HISTORY.map(e=>e.date.slice(5)),
-      datasets:[{label:'Views',data:HISTORY.map(e=>e.views),borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.15)',tension:.4,fill:true,pointRadius:3,pointBackgroundColor:'#3b82f6'}]
+      datasets:[
+        {label:'Views',data:HISTORY.map(e=>e.views),borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.1)',tension:.4,fill:true,pointRadius:3,pointBackgroundColor:'#3b82f6',yAxisID:'y'},
+        ...(hasSubs ? [{label:'Subs',data:HISTORY.map(e=>e.subs||0),borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.05)',tension:.4,fill:false,pointRadius:3,pointBackgroundColor:'#f59e0b',yAxisID:'y2'}] : [])
+      ]
     },
     options:{
       responsive:true,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${fmt(c.raw)} views`}}},
+      plugins:{legend:{display:hasSubs,labels:{color:'#9ca3af',font:{size:11}}},tooltip:{mode:'index',intersect:false,callbacks:{label:c=>c.dataset.label+': '+fmt(c.raw)}}},
       scales:{
         x:{grid:{display:false},ticks:{color:'#6b7280',font:{size:10}}},
-        y:{grid:{color:'#1f2937'},ticks:{color:'#6b7280',font:{size:10},callback:fmt}}
+        y:{grid:{color:'#1f2937'},ticks:{color:'#6b7280',font:{size:10},callback:fmt},position:'left'},
+        ...(hasSubs ? {y2:{grid:{display:false},ticks:{color:'#f59e0b',font:{size:10}},position:'right'}} : {})
       }
     }
   })
+}
+
+// ── A/B Stats ─────────────────────────────────────────────────────────────────
+function renderAbStats() {
+  const ab = STATUS.ab_stats || {}
+  const a = ab['a'] || {avg:0,n:0}
+  const b = ab['b'] || {avg:0,n:0}
+  if (!a.n && !b.n) {
+    document.getElementById('ab-stats').innerHTML = ''; return
+  }
+  const winner = a.avg >= b.avg ? 'A' : 'B'
+  const maxAvg = Math.max(a.avg, b.avg) || 1
+  document.getElementById('ab-stats').innerHTML = `
+    <h2 class="text-lg font-semibold mb-3 text-gray-300">🔬 A/B Test de Títulos</h2>
+    <div class="rounded-xl p-5 grid grid-cols-1 sm:grid-cols-2 gap-6" style="background:#111827">
+      <div>
+        <div class="flex justify-between text-sm mb-2">
+          <span class="font-semibold" style="color:${winner==='A'?'#4ade80':'#9ca3af'}">Variante A ${winner==='A'?'🏆':''}</span>
+          <span class="font-mono text-white">${fmt(a.avg)} avg · ${a.n} vídeos</span>
+        </div>
+        <div style="background:#1f2937;border-radius:9999px;height:10px;overflow:hidden">
+          <div style="background:#3b82f6;height:100%;width:${(a.avg/maxAvg*100).toFixed(1)}%;border-radius:9999px"></div>
+        </div>
+        <p class="text-xs text-gray-600 mt-1">Formato original (yt_title)</p>
+      </div>
+      <div>
+        <div class="flex justify-between text-sm mb-2">
+          <span class="font-semibold" style="color:${winner==='B'?'#4ade80':'#9ca3af'}">Variante B ${winner==='B'?'🏆':''}</span>
+          <span class="font-mono text-white">${fmt(b.avg)} avg · ${b.n} vídeos</span>
+        </div>
+        <div style="background:#1f2937;border-radius:9999px;height:10px;overflow:hidden">
+          <div style="background:#8b5cf6;height:100%;width:${(b.avg/maxAvg*100).toFixed(1)}%;border-radius:9999px"></div>
+        </div>
+        <p class="text-xs text-gray-600 mt-1">Formato alternativo (yt_title_b)</p>
+      </div>
+    </div>`
 }
 
 // ── Queue ──────────────────────────────────────────────────────────────────────
@@ -321,21 +436,39 @@ function renderQueue() {
       : `<div style="display:flex;flex-direction:column;gap:8px">${rows}</div>`}`
 }
 
+// ── Failed ─────────────────────────────────────────────────────────────────────
+function renderFailed() {
+  if (!FAILED.length) { document.getElementById('failed').innerHTML=''; return }
+  const rows = FAILED.map(v=>{
+    const cat=v.category||'Other', c=col(cat)
+    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:8px;background:#111827">
+      <span style="font-size:12px;font-weight:600;padding:2px 8px;border-radius:9999px;background:${c}22;color:${c};flex-shrink:0">${cat}</span>
+      <span style="flex:1;font-size:14px;color:#d1d5db;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.title||''}</span>
+      <span style="font-size:12px;color:#f87171;flex-shrink:0">tentativa ${v.retry_count||0}/3</span>
+    </div>`
+  }).join('')
+  document.getElementById('failed').innerHTML = `
+    <h2 class="text-lg font-semibold mb-3" style="color:#f87171">⚠️ Vídeos Falhados — ${FAILED.length}</h2>
+    <div style="display:flex;flex-direction:column;gap:8px">${rows}</div>`
+}
+
 // ── Fetch & Bootstrap ──────────────────────────────────────────────────────────
 async function fetchAll() {
   const t = '?t='+Date.now()
-  ;[PUB,QUEUE,STATUS,HISTORY] = await Promise.all([
+  ;[PUB,QUEUE,STATUS,HISTORY,FAILED] = await Promise.all([
     fetch('public/published_snapshot.json'+t).then(r=>r.json()).catch(()=>[]),
     fetch('public/queue_snapshot.json'+t).then(r=>r.json()).catch(()=>[]),
     fetch('public/status_snapshot.json'+t).then(r=>r.json()).catch(()=>({})),
     fetch('public/stats_history.json'+t).then(r=>r.json()).catch(()=>[]),
+    fetch('public/failed_snapshot.json'+t).then(r=>r.json()).catch(()=>[]),
   ])
   renderAll()
 }
 
 function renderAll() {
-  renderHdr(); renderStatus(); renderPublished()
-  renderTop3(); renderHour(); renderHist(); renderQueue()
+  renderHdr(); renderStatus(); renderMonetization()
+  renderPublished(); renderTop3(); renderHour()
+  renderHist(); renderAbStats(); renderQueue(); renderFailed()
 }
 
 fetchAll()
