@@ -310,11 +310,34 @@ function setFilt(c) { filt=c; renderPublished() }
 function setSort(k) { sort=k; renderPublished() }
 function setSearch(v) { search=v; renderPublished() }
 
-// ── Top 3 ──────────────────────────────────────────────────────────────────────
+// ── Top 5 Global ───────────────────────────────────────────────────────────────
 function renderTop3() {
+  const top5 = STATUS.top5 || []
+  const medals = ['🥇','🥈','🥉','4','5']
+
+  const globalSection = top5.length ? `
+    <div style="margin-bottom:24px">
+      <p style="font-size:11px;font-weight:600;color:#6b7280;letter-spacing:.05em;margin-bottom:8px">🌍 GLOBAL TOP 5</p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${top5.map((v,i)=>`
+          <a href="${v.url}" target="_blank" rel="noopener noreferrer"
+             style="display:flex;align-items:center;gap:12px;padding:12px;background:#1f2937;border-radius:12px;text-decoration:none;color:inherit">
+            <span style="font-size:18px;width:28px;text-align:center">${medals[i]||i+1}</span>
+            <div style="flex:1;min-width:0">
+              <p style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.title}</p>
+              <div style="display:flex;gap:12px;margin-top:3px">
+                <span style="font-size:11px;color:#ef4444">👁 ${fmt(v.views)}</span>
+                <span style="font-size:11px;color:#4ade80">👍 ${fmt(v.likes)}</span>
+                <span style="font-size:11px;color:#f59e0b">♥ ${v.like_rate}%</span>
+              </div>
+            </div>
+          </a>`).join('')}
+      </div>
+    </div>` : ''
+
+  // Top 3 by category
   const byCat = {}
   PUB.forEach(v=>{ const c=v.category||'Other'; (byCat[c]=byCat[c]||[]).push(v) })
-
   const sections = CAT_ORDER.filter(c=>byCat[c]?.length).map(cat=>{
     const top = [...byCat[cat]].sort((a,b)=>(b.views||0)-(a.views||0)).slice(0,3)
     const items = top.map((v,i)=>`
@@ -323,7 +346,10 @@ function renderTop3() {
         <img src="${v.thumbnail||''}" style="width:48px;height:48px;border-radius:8px;object-fit:cover">
         <div style="flex:1;min-width:0">
           <p style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.title||''}</p>
-          <span style="font-size:11px;color:#ef4444">👁 ${fmt(v.views)}</span>
+          <div style="display:flex;gap:8px;margin-top:2px">
+            <span style="font-size:11px;color:#ef4444">👁 ${fmt(v.views)}</span>
+            <span style="font-size:11px;color:#f59e0b">♥ ${v.like_rate||0}%</span>
+          </div>
         </div>
       </a>`).join('')
     return `<div>
@@ -333,8 +359,11 @@ function renderTop3() {
   }).join('')
 
   document.getElementById('top3').innerHTML = `
-    <h2 class="text-lg font-semibold mb-3 text-gray-300">🏆 Top 3 por Categoria</h2>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px">${sections}</div>`
+    <h2 class="text-lg font-semibold mb-3 text-gray-300">🏆 Top Vídeos</h2>
+    <div style="background:#111827;border-radius:16px;padding:20px">
+      ${globalSection}
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px">${sections}</div>
+    </div>`
 }
 
 // ── Best Hour Chart ────────────────────────────────────────────────────────────
