@@ -121,11 +121,27 @@ function renderHdr() {
   const views = PUB.reduce((s,v)=>s+(v.views||0),0)
   const likes  = PUB.reduce((s,v)=>s+(v.likes||0),0)
   const subs   = STATUS.subscribers || 0
+  let trendViews = '', trendSubs = ''
+  if (HISTORY.length >= 2) {
+    const today = HISTORY[HISTORY.length-1], yest = HISTORY[HISTORY.length-2]
+    if (yest.views > 0) {
+      const pct = Math.round((today.views - yest.views) / yest.views * 100)
+      trendViews = pct >= 0
+        ? ` <span style="color:#4ade80;font-size:11px">↑${pct}%</span>`
+        : ` <span style="color:#f87171;font-size:11px">↓${Math.abs(pct)}%</span>`
+    }
+    if (yest.subs > 0) {
+      const diff = (today.subs||0) - (yest.subs||0)
+      if (diff !== 0) trendSubs = diff > 0
+        ? ` <span style="color:#4ade80;font-size:11px">+${diff}</span>`
+        : ` <span style="color:#f87171;font-size:11px">${diff}</span>`
+    }
+  }
   document.getElementById('hdr').innerHTML =
     `<span><b class="text-white">${PUB.length}</b> publicados</span>` +
-    `<span><b class="text-white">${fmt(views)}</b> views</span>` +
+    `<span><b class="text-white">${fmt(views)}</b> views${trendViews}</span>` +
     `<span><b class="text-white">${likes}</b> likes</span>` +
-    `<span><b class="text-white">${subs}</b> subs</span>` +
+    `<span><b class="text-white">${subs}</b> subs${trendSubs}</span>` +
     `<span><b class="text-white">${QUEUE.length}</b> em fila</span>`
 }
 
@@ -163,14 +179,14 @@ function renderStatus() {
       <p class="text-xs text-gray-500 mt-0.5">${Math.round(subs/1000*100)}% meta 1k</p>
     </div>
     <div>
-      <p class="text-xs text-gray-500 mb-1">Views canal</p>
-      <p class="text-gray-200 font-mono text-sm">${fmt(chViews)}</p>
-      <p class="text-xs text-gray-500 mt-0.5">total histórico</p>
+      <p class="text-xs text-gray-500 mb-1">Receita est.</p>
+      <p class="text-gray-200 font-mono text-sm">$${(PUB.reduce((a,v)=>a+(v.views||0),0)/1000).toFixed(2)}</p>
+      <p class="text-xs text-gray-500 mt-0.5">@ $1 RPM</p>
     </div>
     <div>
-      <p class="text-xs text-gray-500 mb-1">Views engine</p>
-      <p class="text-gray-200 font-mono text-sm">${fmt(PUB.reduce((s,v)=>s+(v.views||0),0))}</p>
-      <p class="text-xs text-gray-500 mt-0.5">${PUB.length} vídeos</p>
+      <p class="text-xs text-gray-500 mb-1">Melhores dias</p>
+      <p class="text-gray-200 font-mono text-sm">${(s.best_days||[]).join(', ') || '— (sem dados)'}</p>
+      <p class="text-xs text-gray-500 mt-0.5">por avg views</p>
     </div>`
 }
 
@@ -184,8 +200,20 @@ function renderMonetization() {
   const subsPct  = Math.min(100, subs / SUB_GOAL * 100)
   const viewsPct = Math.min(100, totalViews / VIEW_GOAL * 100)
 
+  const milestones = [100, 500, 1000]
+  const topReached = [...milestones].reverse().find(m => subs >= m)
+  const nextMs = milestones.find(m => subs < m)
+  const msBanner = topReached ? `
+    <div style="background:linear-gradient(90deg,#f59e0b18,#ef444418);border:1px solid #f59e0b33;border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
+      <span style="font-size:22px">🎉</span>
+      <div>
+        <p style="font-size:14px;font-weight:700;color:#f59e0b">${topReached.toLocaleString()} subscribers atingidos!</p>
+        ${nextMs ? `<p style="font-size:12px;color:#6b7280">Próximo marco: ${nextMs.toLocaleString()} — faltam ${(nextMs-subs).toLocaleString()}</p>` : '<p style="font-size:12px;color:#4ade80">Monetização desbloqueada! 🚀</p>'}
+      </div>
+    </div>` : ''
   document.getElementById('monetization').innerHTML = `
     <h2 class="text-lg font-semibold mb-3 text-gray-300">💰 Progresso para Monetização (YouTube Shorts)</h2>
+    ${msBanner}
     <div class="rounded-xl p-5 grid grid-cols-1 sm:grid-cols-2 gap-6" style="background:#111827">
       <div>
         <div class="flex justify-between text-sm mb-1">
@@ -390,29 +418,55 @@ function renderAbStats() {
   }
   const winner = a.avg >= b.avg ? 'A' : 'B'
   const maxAvg = Math.max(a.avg, b.avg) || 1
+
+  // Format stats per category
+  const fmtStats = STATUS.format_stats || {}
+  const fmtCats = Object.keys(fmtStats)
+  const fmtSection = fmtCats.length ? `
+    <h3 style="font-size:13px;font-weight:600;color:#6b7280;margin:20px 0 12px">Melhor Formato por Categoria</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+      ${fmtCats.map(cat => {
+        const rows = fmtStats[cat]
+        const top = rows[0]
+        const c = col(cat)
+        return `<div style="background:#1f2937;border-radius:10px;padding:12px">
+          <p style="font-size:11px;font-weight:700;color:${c};margin-bottom:8px">${cat.toUpperCase()}</p>
+          ${rows.map((r,i) => `
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <span style="font-size:11px;color:${i===0?'#f59e0b':'#6b7280'};width:16px">${i===0?'🥇':'·'}</span>
+              <span style="font-size:12px;color:${i===0?'white':'#9ca3af'};flex:1">${r.format}</span>
+              <span style="font-size:11px;font-family:monospace;color:${i===0?'#4ade80':'#6b7280'}">${fmt(r.avg)}</span>
+            </div>`).join('')}
+        </div>`
+      }).join('')}
+    </div>` : ''
+
   document.getElementById('ab-stats').innerHTML = `
     <h2 class="text-lg font-semibold mb-3 text-gray-300">🔬 A/B Test de Títulos</h2>
-    <div class="rounded-xl p-5 grid grid-cols-1 sm:grid-cols-2 gap-6" style="background:#111827">
-      <div>
-        <div class="flex justify-between text-sm mb-2">
-          <span class="font-semibold" style="color:${winner==='A'?'#4ade80':'#9ca3af'}">Variante A ${winner==='A'?'🏆':''}</span>
-          <span class="font-mono text-white">${fmt(a.avg)} avg · ${a.n} vídeos</span>
+    <div class="rounded-xl p-5" style="background:#111827">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div>
+          <div class="flex justify-between text-sm mb-2">
+            <span class="font-semibold" style="color:${winner==='A'?'#4ade80':'#9ca3af'}">Variante A ${winner==='A'?'🏆':''}</span>
+            <span class="font-mono text-white">${fmt(a.avg)} avg · ${a.n} vídeos</span>
+          </div>
+          <div style="background:#1f2937;border-radius:9999px;height:10px;overflow:hidden">
+            <div style="background:#3b82f6;height:100%;width:${(a.avg/maxAvg*100).toFixed(1)}%;border-radius:9999px"></div>
+          </div>
+          <p class="text-xs text-gray-600 mt-1">Formato original (yt_title)</p>
         </div>
-        <div style="background:#1f2937;border-radius:9999px;height:10px;overflow:hidden">
-          <div style="background:#3b82f6;height:100%;width:${(a.avg/maxAvg*100).toFixed(1)}%;border-radius:9999px"></div>
+        <div>
+          <div class="flex justify-between text-sm mb-2">
+            <span class="font-semibold" style="color:${winner==='B'?'#4ade80':'#9ca3af'}">Variante B ${winner==='B'?'🏆':''}</span>
+            <span class="font-mono text-white">${fmt(b.avg)} avg · ${b.n} vídeos</span>
+          </div>
+          <div style="background:#1f2937;border-radius:9999px;height:10px;overflow:hidden">
+            <div style="background:#8b5cf6;height:100%;width:${(b.avg/maxAvg*100).toFixed(1)}%;border-radius:9999px"></div>
+          </div>
+          <p class="text-xs text-gray-600 mt-1">Formato alternativo (yt_title_b)</p>
         </div>
-        <p class="text-xs text-gray-600 mt-1">Formato original (yt_title)</p>
       </div>
-      <div>
-        <div class="flex justify-between text-sm mb-2">
-          <span class="font-semibold" style="color:${winner==='B'?'#4ade80':'#9ca3af'}">Variante B ${winner==='B'?'🏆':''}</span>
-          <span class="font-mono text-white">${fmt(b.avg)} avg · ${b.n} vídeos</span>
-        </div>
-        <div style="background:#1f2937;border-radius:9999px;height:10px;overflow:hidden">
-          <div style="background:#8b5cf6;height:100%;width:${(b.avg/maxAvg*100).toFixed(1)}%;border-radius:9999px"></div>
-        </div>
-        <p class="text-xs text-gray-600 mt-1">Formato alternativo (yt_title_b)</p>
-      </div>
+      ${fmtSection}
     </div>`
 }
 
