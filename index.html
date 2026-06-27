@@ -67,8 +67,17 @@
     </div>
   </section>
 
+  <!-- Category Trends -->
+  <section id="cat-trends"></section>
+
+  <!-- Likability Index -->
+  <section id="likability"></section>
+
   <!-- A/B Stats -->
   <section id="ab-stats"></section>
+
+  <!-- Fail Histogram -->
+  <section id="fail-hist"></section>
 
   <!-- Queue -->
   <section id="queue"></section>
@@ -447,6 +456,69 @@ function renderHist() {
   })
 }
 
+// ── Category Trends ────────────────────────────────────────────────────────────
+function renderCatTrends() {
+  const ct = STATUS.category_trends || {}
+  const cats = Object.keys(ct)
+  if (!cats.length) { document.getElementById('cat-trends').innerHTML=''; return }
+  const rows = cats.sort((a,b)=>(ct[b].avg_views||0)-(ct[a].avg_views||0)).map(cat=>{
+    const d = ct[cat]
+    const c = col(cat)
+    const trend = d.trend_pct
+    const tColor = trend > 10 ? '#4ade80' : trend < -10 ? '#f87171' : '#fcd34d'
+    const tArrow = trend > 10 ? '↑' : trend < -10 ? '↓' : '→'
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#1f2937;border-radius:10px">
+      <span style="font-size:11px;font-weight:700;color:${c};width:90px;flex-shrink:0">${cat}</span>
+      <span style="font-size:12px;color:#9ca3af;width:28px;flex-shrink:0">${d.n}v</span>
+      <div style="flex:1;background:#374151;border-radius:9999px;height:6px;overflow:hidden">
+        <div style="background:${c};height:100%;width:${Math.min(100,(d.avg_views||0)/20)}%;border-radius:9999px"></div>
+      </div>
+      <span style="font-size:12px;font-family:monospace;color:white;width:60px;text-align:right">${fmt(d.avg_views)}</span>
+      <span style="font-size:12px;font-weight:700;color:${tColor};width:52px;text-align:right">${tArrow}${Math.abs(trend)}%</span>
+    </div>`
+  }).join('')
+  document.getElementById('cat-trends').innerHTML = `
+    <h2 class="text-lg font-semibold mb-3 text-gray-300">📊 Tendências por Categoria (7 dias)</h2>
+    <div style="background:#111827;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px">${rows}</div>`
+}
+
+// ── Likability Index ────────────────────────────────────────────────────────────
+function renderLikability() {
+  const top = STATUS.likability_top || []
+  if (!top.length) { document.getElementById('likability').innerHTML=''; return }
+  const rows = top.map((v,i)=>`
+    <a href="${v.url}" target="_blank" rel="noopener noreferrer"
+       style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#1f2937;border-radius:10px;text-decoration:none;color:inherit">
+      <span style="font-size:14px;width:24px;text-align:center;color:#6b7280">${i+1}</span>
+      <span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.title}</span>
+      <span style="font-size:11px;color:#86efac;font-family:monospace;white-space:nowrap">♥${v.like_rate}%</span>
+      <span style="font-size:11px;color:#93c5fd;font-family:monospace;white-space:nowrap">💬${v.comment_rate}%</span>
+      <span style="font-size:11px;color:#fcd34d;font-family:monospace;white-space:nowrap">👁${fmt(v.views)}</span>
+    </a>`).join('')
+  document.getElementById('likability').innerHTML = `
+    <h2 class="text-lg font-semibold mb-3 text-gray-300">❤️ Índice de Likability (like+comment rate)</h2>
+    <div style="background:#111827;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px">${rows}</div>`
+}
+
+// ── Fail Histogram ─────────────────────────────────────────────────────────────
+function renderFailHist() {
+  const fh = STATUS.fail_histogram || {}
+  const keys = Object.keys(fh)
+  if (!keys.length) { document.getElementById('fail-hist').innerHTML=''; return }
+  const max = Math.max(...Object.values(fh))
+  const rows = keys.map(r=>`
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:12px;color:#9ca3af;width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r}</span>
+      <div style="flex:1;background:#1f2937;border-radius:9999px;height:6px;overflow:hidden">
+        <div style="background:#ef4444;height:100%;width:${Math.round(fh[r]/max*100)}%;border-radius:9999px"></div>
+      </div>
+      <span style="font-size:12px;color:#f87171;font-family:monospace;width:24px;text-align:right">${fh[r]}</span>
+    </div>`).join('')
+  document.getElementById('fail-hist').innerHTML = `
+    <h2 class="text-lg font-semibold mb-3" style="color:#f87171">🔴 Causas de Falha</h2>
+    <div style="background:#111827;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px">${rows}</div>`
+}
+
 // ── A/B Stats ─────────────────────────────────────────────────────────────────
 function renderAbStats() {
   const ab = STATUS.ab_stats || {}
@@ -561,7 +633,8 @@ async function fetchAll() {
 function renderAll() {
   renderHdr(); renderStatus(); renderMonetization()
   renderPublished(); renderTop3(); renderHour()
-  renderHist(); renderAbStats(); renderQueue(); renderFailed()
+  renderHist(); renderCatTrends(); renderLikability()
+  renderAbStats(); renderFailHist(); renderQueue(); renderFailed()
 }
 
 fetchAll()
