@@ -1,8 +1,6 @@
-import PublishedSection from './PublishedSection'
 import StatusBar from './StatusBar'
 import StatsChart from './StatsChart'
-import Top3Section from './Top3Section'
-import BestHourChart from './BestHourChart'
+import LiveDashboard from './LiveDashboard'
 
 export const revalidate = 120
 
@@ -71,12 +69,6 @@ const DEFAULT_STATUS: Status = {
   mpt_online: false,
 }
 
-function fmt(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return String(n)
-}
-
 export default async function Page() {
   const [published, queue, status, history] = await Promise.all([
     getArr<Pub>('published_snapshot.json'),
@@ -84,9 +76,6 @@ export default async function Page() {
     getObj<Status>('status_snapshot.json', DEFAULT_STATUS),
     getArr<HistoryEntry>('stats_history.json'),
   ])
-
-  const totalViews = published.reduce((s, v) => s + v.views, 0)
-  const totalLikes = published.reduce((s, v) => s + v.likes, 0)
 
   return (
     <main className="max-w-7xl mx-auto p-6 space-y-8">
@@ -97,9 +86,6 @@ export default async function Page() {
           <h1 className="text-2xl font-bold tracking-tight">MoneyAgent MAX</h1>
         </div>
         <div className="flex gap-6 text-sm text-gray-400">
-          <span><span className="text-white font-semibold">{published.length}</span> publicados</span>
-          <span><span className="text-white font-semibold">{fmt(totalViews)}</span> views</span>
-          <span><span className="text-white font-semibold">{fmt(totalLikes)}</span> likes</span>
           <span><span className="text-white font-semibold">{queue.length}</span> em fila</span>
         </div>
       </div>
@@ -107,22 +93,13 @@ export default async function Page() {
       {/* Engine status */}
       <StatusBar status={status} />
 
-      {/* Published — filterable by category + sortable */}
-      <PublishedSection videos={published} />
+      {/* Published — filterable, sortable, com botão de atualização em tempo real */}
+      <LiveDashboard initialPublished={published} />
 
       {/* Stats history chart */}
       <section>
         <h2 className="text-lg font-semibold mb-3 text-gray-300">📈 Crescimento de Views</h2>
         <StatsChart history={history} />
-      </section>
-
-      {/* Top 3 per category */}
-      <Top3Section videos={published} />
-
-      {/* Best publish hour */}
-      <section>
-        <h2 className="text-lg font-semibold mb-3 text-gray-300">⏰ Análise de Hora de Publicação</h2>
-        <BestHourChart videos={published} />
       </section>
 
       {/* Upload queue — always visible */}
