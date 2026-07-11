@@ -13,6 +13,7 @@ interface Pub {
   views: number
   likes: number
   comments: number
+  avg_view_pct: number
   uploaded_at: string
 }
 
@@ -30,6 +31,9 @@ interface Status {
   uploads_today: number
   queue_breakdown: { script_ready: number; generating: number; ready_to_upload: number }
   mpt_online: boolean
+  alerts?: string[]
+  quota_blocked?: boolean
+  retention_summary?: { avg_pct: number; n: number; enabled: boolean }
 }
 
 interface HistoryEntry {

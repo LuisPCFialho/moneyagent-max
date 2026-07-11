@@ -11,6 +11,7 @@ interface Pub {
   views: number
   likes: number
   comments: number
+  avg_view_pct: number
   uploaded_at: string
 }
 
@@ -41,10 +42,13 @@ function Card({ v }: { v: Pub }) {
         <p className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-red-400 transition-colors">
           {v.title}
         </p>
-        <div className="flex gap-2 mt-2 text-xs">
+        <div className="flex gap-2 mt-2 text-xs flex-wrap">
           <span className="bg-blue-900/60 text-blue-300 px-2 py-0.5 rounded-full">👁 {fmt(v.views)}</span>
           <span className="bg-green-900/60 text-green-300 px-2 py-0.5 rounded-full">👍 {fmt(v.likes)}</span>
           <span className="bg-yellow-900/60 text-yellow-300 px-2 py-0.5 rounded-full">💬 {fmt(v.comments)}</span>
+          {v.avg_view_pct > 0 && (
+            <span className="bg-purple-900/60 text-purple-300 px-2 py-0.5 rounded-full">📊 {v.avg_view_pct.toFixed(0)}%</span>
+          )}
         </div>
       </div>
     </a>

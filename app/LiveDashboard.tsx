@@ -14,6 +14,7 @@ interface Pub {
   views: number
   likes: number
   comments: number
+  avg_view_pct: number
   uploaded_at: string
 }
 
