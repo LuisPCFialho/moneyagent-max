@@ -31,7 +31,7 @@
   </div>
 
   <!-- Status Bar -->
-  <div id="status" class="rounded-xl p-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 text-sm" style="background:#111827"></div>
+  <div id="status" class="rounded-xl p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-4 text-sm" style="background:#111827"></div>
 
   <!-- Monetização -->
   <section id="monetization"></section>
@@ -182,6 +182,11 @@ function renderStatus() {
       <p class="text-xs text-gray-500 mb-1">Apagados</p>
       <p class="text-gray-200 font-mono text-lg font-bold">${s.deleted_total??0}</p>
       <p class="text-xs text-gray-500 mt-0.5">24h: <span class="${(s.deleted_24h??0)>0?'text-red-400 font-bold':'text-gray-500'}">${s.deleted_24h??0}</span></p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500 mb-1">Descartados s/ imagens</p>
+      <p class="text-gray-200 font-mono text-lg font-bold">${s.discarded_nofootage_total??0}</p>
+      <p class="text-xs text-gray-500 mt-0.5">24h: <span class="${(s.discarded_nofootage_24h??0)>0?'text-amber-400 font-bold':'text-gray-500'}">${s.discarded_nofootage_24h??0}</span></p>
     </div>
     <div>
       <p class="text-xs text-gray-500 mb-1">Buffer</p>
